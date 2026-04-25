@@ -4,12 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/spf13/cobra"
-	"io"
-	"log"
 	"net/http"
-	"regexp"
 	"runtime"
-	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -31,47 +27,31 @@ func doUpgrade() {
 		fmt.Println("[tips] offline mode can't update from remote.")
 		return
 	}
-	// 获取 command 文件目录
-	fetchAllAndCreateCache()
-	// 获取每一个 command 文件
+	meta, err := fetchLatestCommandMeta()
+	if err != nil {
+		fmt.Printf("[sorry] failed to fetch latest command metadata, details is: %s\n", err.Error())
+		return
+	}
+	cache.LatestVersion = meta.GetLatestVersion()
+	cache.Cmds = meta.GetCommandMaps()
 	fetchFileAndFillCache()
-	// 持久化 cache
 	persistCache()
 }
 
-func fetchAllContents(url string) string {
-	resp, err := http.Get(url)
+func fetchLatestCommandMeta() (*CommandMeta, error) {
+	resp, err := http.Get(latestCommandMetaURL)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
-	body := resp.Body
-	defer body.Close()
-	b, err := io.ReadAll(body)
-	if err != nil {
-		log.Fatalln(err)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("remote responded with %s", resp.Status)
 	}
-	contents := string(b)
-	front := "<script>window.__DATA__ = "
-	back := "</script>"
-	regex := regexp.MustCompile(fmt.Sprintf("%s(.*?)%s", front, back))
-	target := regex.FindString(contents)
-	if len(target) == 0 {
-		log.Fatalln("Found not")
+	meta := new(CommandMeta)
+	if err := json.NewDecoder(resp.Body).Decode(meta); err != nil {
+		return nil, err
 	}
-	target = strings.Replace(target, front, "", -1)
-	target = strings.Replace(target, back, "", -1)
-	return target
-}
-
-func fetchAllAndCreateCache() {
-	contents := fetchAllContents(fmt.Sprintf(pkgTemplate, version))
-	var pkg Package
-	err := json.Unmarshal([]byte(contents), &pkg)
-	if err != nil {
-		panic(err)
-	}
-	cache.LatestVersion = pkg.GetLatestVersion()
-	cache.Cmds = pkg.GetCommandMaps()
+	return meta, nil
 }
 
 // fetchFileAndFillCache 依次发起 http 请求，将每个 command 对应的 .md 文件缓存到本地
@@ -84,7 +64,7 @@ func fetchFileAndFillCache() {
 	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
 		wg.Go(func() {
 			for item := range ch {
-				if err := item.FillSelf(cmdTemplate, cache.GetLatestVersion()); err != nil {
+				if err := item.FillSelf(cache.GetLatestVersion()); err != nil {
 					atomic.AddInt64(&failed, 1)
 				}
 				atomic.AddInt64(&all, 1)

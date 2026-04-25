@@ -3,9 +3,10 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
+
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -14,10 +15,9 @@ const (
 )
 
 const (
-	version     = "1.18.0"
-	rootUrl     = `https://unpkg.com/linux-command@%s`
-	pkgTemplate = rootUrl + "/command/"
-	cmdTemplate = rootUrl + "%s"
+	version              = "1.22.0"
+	latestCommandMetaURL = `https://unpkg.com/linux-command/command/?meta`
+	commandURLTemplate   = `https://unpkg.com/linux-command@%s%s`
 )
 
 var (
@@ -58,9 +58,15 @@ func init() {
 
 	if fileExist(cachePath) {
 		parseCache()
-	} else {
-		fmt.Println("[tips] cache info is not found, please use offline cmd to unzip resource or use upgrade cmd to update resource.")
 	}
+}
+
+func cacheReady() bool {
+	return fileExist(cachePath) && len(cache.GetCmds()) > 0
+}
+
+func printCacheMissingTips() {
+	fmt.Println("[tips] cache info is not found, please use offline cmd to unzip resource or use upgrade cmd to update resource.")
 }
 
 func setDefaultEnv() {

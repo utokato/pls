@@ -14,8 +14,8 @@ var searchCommand = &cobra.Command{
 	Short: "Search command by keywords",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) == 0 {
-			fmt.Println("[sorry] the search command does not accept any keywords")
+		if !cacheReady() {
+			printCacheMissingTips()
 			return
 		}
 		doSearch(args[0])

@@ -11,21 +11,19 @@ import (
 )
 
 var offlineCommand = &cobra.Command{
-	Use:   "offline <command>",
+	Use:   "offline <enable|disable>",
 	Short: "Set the current context to offline, and load infos from local",
 	Example: `# Set offline ctx
-pls offline
-pls offline true
+	pls offline enable
 					
 # Set online ctx
-pls offline false
-pls offline off`,
-	Args: cobra.MinimumNArgs(1),
+	pls offline disable`,
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		flag := true
-		str := args[0]
-		if str == "false" || str == "off" {
-			flag = false
+		flag, ok := parseOfflineFlag(args[0])
+		if !ok {
+			fmt.Println("[sorry] offline command only accepts enable or disable")
+			return
 		}
 		doSetOffline(flag)
 	},
@@ -35,17 +33,36 @@ func init() {
 	rootCmd.AddCommand(offlineCommand)
 }
 
+func parseOfflineFlag(raw string) (bool, bool) {
+	switch raw {
+	case "enable":
+		return true, true
+	case "disable":
+		return false, true
+	default:
+		return false, false
+	}
+}
+
 func doSetOffline(flag bool) {
 	if !flag {
 		// 如果关闭离线模式，则先清理之前的旧数据
 		err := os.RemoveAll(dirPath)
 		if err != nil {
 			fmt.Println("[sorry] clear data fail when set offline closed")
+			return
 		}
+		err = makeCmdDir(dirPath)
+		if err != nil {
+			fmt.Println("[sorry] failed to recreate command dir when set offline closed")
+			return
+		}
+		persistEnv(false, false)
 		return
 	}
 	// 开启离线模式，但是之前的压缩包已经解压过，就不在处理了
 	if env.Decompressed {
+		persistEnv(true, true)
 		return
 	}
 

@@ -15,11 +15,10 @@ var showCommand = &cobra.Command{
 	Short: "Show the specified command usage",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) == 0 {
-			fmt.Println("[sorry] the show command does not accept any arguments")
+		if !cacheReady() {
+			printCacheMissingTips()
 			return
 		}
-
 		force, _ := cmd.Flags().GetBool("force")
 		doShow(args[0], force)
 	},
@@ -34,9 +33,13 @@ func init() {
 func doShow(cmdName string, force bool) {
 	cmds := cache.GetCmds()
 	command, exist := cmds[cmdName]
+	if !exist {
+		fmt.Printf("[sorry] could not found command <%s>\n", cmdName)
+		return
+	}
 	// only online mode can force refresh
 	if force && !env.Offline {
-		if err := command.FillSelf(cmdTemplate, cache.GetLatestVersion()); err != nil {
+		if err := command.FillSelf(cache.GetLatestVersion()); err != nil {
 			if errors.Is(err, ErrCommandNotFound) {
 				fmt.Printf("[sorry] could not found command <%s>\n", cmdName)
 			} else {
@@ -46,10 +49,6 @@ func doShow(cmdName string, force bool) {
 		}
 		// 强制更新获取了最新的 command 对应的 .md 文件后，需要重新构建一下本地缓存
 		persistCache()
-	}
-	if !exist {
-		fmt.Printf("[sorry] could not found command <%s>\n", cmdName)
-		return
 	}
 	// 将 .md 文件展示到控制台上
 	fp := path.Join(dirPath, fmt.Sprintf("%s.md", command.Name))

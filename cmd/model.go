@@ -15,26 +15,15 @@ var (
 	ErrCommandNotFound = errors.New("command not found")
 )
 
-type Package struct {
-	PackageName       string   `json:"packageName"`
-	PackageVersion    string   `json:"packageVersion"`
-	AvailableVersions []string `json:"availableVersions"`
-	Filename          string   `json:"filename"`
-	Target            Target   `json:"target"`
+type CommandMeta struct {
+	Version string            `json:"version"`
+	Prefix  string            `json:"prefix"`
+	Files   []CommandMetaFile `json:"files"`
 }
 
-type Target struct {
-	Path    string            `json:"path"`
-	Type    string            `json:"type"`
-	Details map[string]Detail `json:"details"`
-}
-
-type Detail struct {
-	Path        string `json:"path"`
-	Type        string `json:"type"`
-	ContentType string `json:"contentType"`
-	Integrity   string `json:"integrity"`
-	Size        int    `json:"size"`
+type CommandMetaFile struct {
+	Path string `json:"path"`
+	Type string `json:"type"`
 }
 
 type Cmd struct {
@@ -61,26 +50,28 @@ func (c *Cache) GetCmds() map[string]*Cmd {
 	return c.Cmds
 }
 
-func (pkg *Package) GetLatestVersion() string {
-	return pkg.AvailableVersions[len(pkg.AvailableVersions)-1]
+func (meta *CommandMeta) GetLatestVersion() string {
+	return meta.Version
 }
 
-func (pkg *Package) GetCommandMaps() map[string]*Cmd {
-	inner := make(map[string]*Cmd, 512)
-	for k := range pkg.Target.Details {
-		s := strings.Replace(k, "/command/", "", -1)
-		s = strings.Replace(s, ".md", "", -1)
-		inner[s] = &Cmd{
-			Name: s,
-			Path: k,
+func (meta *CommandMeta) GetCommandMaps() map[string]*Cmd {
+	inner := make(map[string]*Cmd, len(meta.Files))
+	for _, item := range meta.Files {
+		if item.Type != "text/markdown" || !strings.HasSuffix(item.Path, ".md") {
+			continue
+		}
+		name := strings.TrimSuffix(strings.TrimPrefix(item.Path, meta.Prefix), ".md")
+		inner[name] = &Cmd{
+			Name: name,
+			Path: item.Path,
 		}
 	}
 	return inner
 }
 
 // FillSelf 发起 Http 请求获取 .md 文件
-func (cmd *Cmd) FillSelf(urlTemplate, latestVersion string) error {
-	url := fmt.Sprintf(urlTemplate, latestVersion, cmd.Path)
+func (cmd *Cmd) FillSelf(latestVersion string) error {
+	url := fmt.Sprintf(commandURLTemplate, latestVersion, cmd.Path)
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
