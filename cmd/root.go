@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	plsVersion = "1.1.0"
+	plsVersion = "1.2.0"
 	dir        = ".commands"
 )
 
