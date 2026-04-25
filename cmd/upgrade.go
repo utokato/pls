@@ -82,9 +82,7 @@ func fetchFileAndFillCache() {
 	wg := sync.WaitGroup{}
 
 	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for item := range ch {
 				if err := item.FillSelf(cmdTemplate, cache.GetLatestVersion()); err != nil {
 					atomic.AddInt64(&failed, 1)
@@ -92,7 +90,7 @@ func fetchFileAndFillCache() {
 				atomic.AddInt64(&all, 1)
 				fmt.Printf("[busy working] upgrade command:<%d/%d> => %s\n", atomic.LoadInt64(&all), len(cmds), item.Name)
 			}
-		}()
+		})
 	}
 
 	for _, item := range cmds {
