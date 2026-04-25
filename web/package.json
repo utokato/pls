@@ -10,14 +10,14 @@
   },
   "dependencies": {
     "@kangc/v-md-editor": "^2.3.18",
-    "axios": "^1.7.7",
-    "element-plus": "^2.8.4",
-    "highlight.js": "^11.10.0",
-    "vue": "^3.5.10",
-    "vue-router": "^4.4.5"
+    "axios": "^1.15.2",
+    "element-plus": "^2.13.7",
+    "highlight.js": "^11.11.1",
+    "vue": "^3.5.33",
+    "vue-router": "^5.0.6"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.1.4",
-    "vite": "^5.4.8"
+    "@vitejs/plugin-vue": "^6.0.6",
+    "vite": "^8.0.10"
   }
 }
