@@ -1,18 +1,20 @@
 package cmd
 
 import (
-	"errors"
+	"context"
 	"fmt"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 	"github.com/spf13/cobra"
 	"io/fs"
 	"net/http"
 	"os"
+	"os/signal"
 	"path"
 	"pls/offline"
 	"pls/resp"
 	"strings"
+	"syscall"
 )
 
 const port = 6023
@@ -37,9 +39,8 @@ func init() {
 
 func doServe() {
 	server := echo.New()
-	server.HideBanner = true
 	server.Use(middleware.Recover())
-	server.Use(middleware.CORS())
+	server.Use(middleware.CORS("*"))
 
 	server.GET("/v1/healthz", handleHealthz)
 	server.GET("/v1/command/search", handleSearch)
@@ -50,7 +51,9 @@ func doServe() {
 
 	// Start server
 	address := fmt.Sprintf(":%d", port)
-	if err := server.Start(address); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	if err := (echo.StartConfig{Address: address, HideBanner: true}).Start(ctx, server); err != nil {
 		fmt.Println("[sorry] failed to start server")
 	}
 }
@@ -60,26 +63,23 @@ func handleStaticFilesServer(e *echo.Echo) {
 		HTML5:      true,
 		Filesystem: getFileSystem("dist"),
 	}))
-	e.Group("assets").Use(
+	e.StaticFS(
+		"/assets",
+		getFileSystem("dist/assets"),
 		middleware.GzipWithConfig(
 			middleware.GzipConfig{
 				Level: 5,
 			}),
 		func(next echo.HandlerFunc) echo.HandlerFunc {
-			return func(c echo.Context) error {
+			return func(c *echo.Context) error {
 				c.Response().Header().Set(echo.HeaderCacheControl, "max-age=31536000, immutable")
 				return next(c)
 			}
-
 		},
-		middleware.StaticWithConfig(middleware.StaticConfig{
-			Filesystem: getFileSystem("dist/assets"),
-		},
-		),
 	)
 }
 
-func handleShow(c echo.Context) error {
+func handleShow(c *echo.Context) error {
 	cmdName := c.QueryParam("keyword")
 	cmds := cache.GetCmds()
 	command, exist := cmds[cmdName]
@@ -102,7 +102,7 @@ func handleShow(c echo.Context) error {
 	return c.JSON(http.StatusOK, resp.Success(string(source)))
 }
 
-func handleSearch(c echo.Context) error {
+func handleSearch(c *echo.Context) error {
 	var res []SearchItem
 	key := c.QueryParam("keyword")
 	if key == "" {
@@ -131,14 +131,14 @@ func handleSearch(c echo.Context) error {
 	return c.JSON(http.StatusOK, resp.Success(res))
 }
 
-func handleHealthz(c echo.Context) error {
+func handleHealthz(c *echo.Context) error {
 	return c.JSON(http.StatusOK, resp.Success("Ok"))
 }
 
-func getFileSystem(path string) http.FileSystem {
+func getFileSystem(path string) fs.FS {
 	f, err := fs.Sub(offline.Dist, path)
 	if err != nil {
 		panic(err)
 	}
-	return http.FS(f)
+	return f
 }

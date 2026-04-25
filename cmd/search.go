@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/olekukonko/tablewriter"
+	"github.com/olekukonko/tablewriter/tw"
 	"github.com/spf13/cobra"
 	"os"
 	"strings"
@@ -26,9 +27,15 @@ func init() {
 }
 
 func doSearch(keyword string) {
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"command", "description"})
-	table.SetRowLine(true)
+	table := tablewriter.NewTable(
+		os.Stdout,
+		tablewriter.WithRendition(tw.Rendition{
+			Settings: tw.Settings{
+				Separators: tw.Separators{BetweenRows: tw.On},
+			},
+		}),
+	)
+	table.Header([]string{"command", "description"})
 	keyword = strings.ToLower(keyword)
 	for k, v := range cache.GetCmds() {
 		k = strings.ToLower(k)
@@ -42,5 +49,7 @@ func doSearch(keyword string) {
 			continue
 		}
 	}
-	table.Render()
+	if err := table.Render(); err != nil {
+		fmt.Println("[sorry] failed to render search table")
+	}
 }

@@ -12,6 +12,5 @@ echo "Build front end app success!"
 
 # 编译 go 应用
 echo "Building go app..."
-go env -w GOOS=linux
-go build -o bin/pls main.go
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOFLAGS=-trimpath go build -ldflags="-s -w" -o bin/pls main.go
 echo "Build go app success!"
